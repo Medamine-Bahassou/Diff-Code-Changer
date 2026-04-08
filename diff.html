@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ΔCODE — AI Diff Updater</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;700&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #1a1a1a;
+    --bg4: #222222;
+    --border: #2a2a2a;
+    --border2: #3a3a3a;
+    --text: #f0f0f0;
+    --text2: #888;
+    --text3: #555;
+    --accent: #ffffff;
+    --add: #1a2e1a;
+    --add-text: #4dff91;
+    --remove: #2e1a1a;
+    --remove-text: #ff4d4d;
+    --line-h: 22px;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  @keyframes slideInLeft { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideInRight { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideInDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes flashGreen { 0% { background: rgba(77,255,145,0.08); } 100% { background: transparent; } }
+
+  /* ── TITLEBAR ──────────────────────────────── */
+  #titlebar {
+    height: 40px;
+    background: #000000;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    -webkit-app-region: drag;
+    z-index: 9999;
+    flex-shrink: 0;
+  }
+  #titlebar .logo-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px; letter-spacing: 6px;
+    color: #ffffff;
+  }
+  #titlebar .win-controls {
+    display: flex; gap: 0;
+    -webkit-app-region: no-drag;
+  }
+  .win-btn {
+    width: 40px; height: 40px;
+    background: transparent; border: none; cursor: pointer;
+    color: #888888; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    -webkit-app-region: no-drag;
+  }
+  .win-btn:hover { background: #1a1a1a; color: #ffffff; }
+  .win-btn.close:hover { background: #ff2222; color: #ffffff; }
+
+  /* HEADER */
+  #header {
+    height: 46px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    animation: slideInDown 0.4s ease;
+    background: var(--bg);
+    position: relative;
+    z-index: 100;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-delta {
+    font-size: 20px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    border-color: var(--text);
+    color: var(--text);
+    background: var(--bg3);
+  }
+
+  .btn-primary {
+    border-color: var(--text);
+    color: var(--bg);
+    background: var(--text);
+  }
+
+  .btn-primary:hover {
+    background: #ccc;
+    border-color: #ccc;
+    color: var(--bg);
+  }
+
+  .btn-danger {
+    border-color: #ff4d4d44;
+    color: #ff4d4d;
+  }
+  .btn-danger:hover { border-color: #ff4d4d; background: #ff4d4d11; }
+
+  .btn-success {
+    border-color: #4dff9144;
+    color: #4dff91;
+  }
+  .btn-success:hover { border-color: #4dff91; background: #4dff9111; }
+
+  /* MAIN LAYOUT */
+  #app {
+    display: flex;
+    /* 46px header + 40px titlebar = 86px */
+    height: calc(100vh - 86px);
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL */
+  #left-panel {
+    width: 55%;
+    display: flex;
+    flex-direction: column;
+    animation: slideInLeft 0.5s ease;
+    min-width: 280px;
+  }
+
+  /* RIGHT PANEL */
+  #right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.5s ease;
+    min-width: 200px;
+  }
+
+  /* EDITOR PANES */
+  .editor-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+
+  .editor-pane:first-child {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editor-label {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .editor-label-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--text3);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.green { background: #4dff91; animation: pulse 2s infinite; }
+  .status-dot.red { background: #ff4d4d; }
+  .status-dot.yellow { background: #ffd93d; animation: pulse 1.5s infinite; }
+
+  /* MONACO WRAPPER */
+  .monaco-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+
+  /* Monaco containers must fill their parent */
+  #monaco-code-container,
+  #monaco-diff-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .monaco-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--bg);
+    z-index: 2;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--text2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* DIFF VIEWER */
+  .diff-line {
+    display: flex;
+    align-items: stretch;
+    min-height: var(--line-h);
+    padding: 0 16px 0 0;
+  }
+
+  .diff-line .dl-num {
+    width: 42px;
+    color: var(--text3);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .diff-line .dl-sign {
+    width: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .diff-line .dl-code {
+    flex: 1;
+    white-space: pre;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+  }
+
+  .diff-line.add { background: var(--add); }
+  .diff-line.add .dl-sign { color: var(--add-text); }
+  .diff-line.add .dl-code { color: var(--add-text); }
+  .diff-line.remove { background: var(--remove); }
+  .diff-line.remove .dl-sign { color: var(--remove-text); }
+  .diff-line.remove .dl-code { color: var(--remove-text); text-decoration: line-through; opacity: 0.8; }
+  .diff-line.header { background: var(--bg3); }
+  .diff-line.header .dl-code { color: #888; font-style: italic; }
+  .diff-line.meta { background: var(--bg2); }
+  .diff-line.meta .dl-code { color: var(--text3); }
+
+  .diff-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--text3);
+  }
+
+  .diff-placeholder .ph-icon {
+    font-size: 32px;
+    opacity: 0.3;
+  }
+
+  .diff-placeholder .ph-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* PREVIEW */
+  #preview-frame {
+    flex: 1;
+    border: none;
+    background: white;
+    transition: opacity 0.3s ease;
+  }
+
+  .preview-toolbar {
+    height: 36px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .preview-toolbar .url-bar {
+    flex: 1;
+    height: 22px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.3px;
+  }
+
+  /* MODE TOGGLE */
+  .mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .mode-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .mode-btn.active { color: var(--text); background: var(--bg3); }
+  .mode-btn:hover:not(.active) { color: var(--text2); }
+
+  /* HORIZONTAL RESIZER (between left & right panels) */
+  .h-resizer {
+    width: 5px;
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    background: var(--border);
+    transition: background 0.2s ease;
+  }
+
+  .h-resizer:hover,
+  .h-resizer.dragging {
+    background: var(--border2);
+  }
+
+  .h-resizer::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 40px;
+    border-radius: 2px;
+    background: var(--text3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .h-resizer:hover::after,
+  .h-resizer.dragging::after {
+    opacity: 0.5;
+  }
+
+  /* VERTICAL RESIZER (between code & diff panes) */
+  .v-resizer {
+    height: 5px;
+    cursor: row-resize;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    background: var(--border);
+    transition: background 0.2s ease;
+  }
+
+  .v-resizer:hover,
+  .v-resizer.dragging {
+    background: var(--border2);
+  }
+
+  .v-resizer::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    height: 3px;
+    width: 40px;
+    border-radius: 2px;
+    background: var(--text3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .v-resizer:hover::after,
+  .v-resizer.dragging::after {
+    opacity: 0.5;
+  }
+
+  /* NOTIFICATION */
+  .notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    z-index: 1000;
+    animation: slideUp 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 360px;
+  }
+
+  .notification.success { border-color: #4dff9144; color: #4dff91; }
+  .notification.error { border-color: #ff4d4d44; color: #ff4d4d; }
+  .notification.info { border-color: #4d91ff44; color: #4d91ff; }
+
+  /* HINT BAR */
+  .hint-bar {
+    height: 24px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kbd {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text2);
+  }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+
+  .stat {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .stat-val { color: var(--text2); }
+
+  /* DIFF AREA */
+  #diff-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+
+  #diff-raw-mode { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  #diff-visual-mode { flex: 1; overflow: auto; }
+
+  /* SCANLINE */
+  .scanline-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+    opacity: 0.03;
+  }
+
+  .scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: white;
+    animation: scanline 8s linear infinite;
+  }
+
+  /* SCROLLBAR (global, non-Monaco) */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+  /* Flash overlay for apply */
+  .apply-flash-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    animation: flashGreen 0.7s ease forwards;
+  }
+
+  /* Prevent text selection while dragging */
+  body.resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+  body.resizing-v {
+    cursor: row-resize !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline-container"><div class="scanline"></div></div>
+
+<!-- ╔══════════════════════════════════════════════════════╗ -->
+<!-- ║  TITLEBAR                                            ║ -->
+<!-- ╚══════════════════════════════════════════════════════╝ -->
+<div id="titlebar">
+  <div class="logo-text">ΔCODE</div>
+  <div class="win-controls">
+    <button class="win-btn" onclick="winMin()">
+      <svg width="10" height="10" viewBox="0 0 10 10"><rect y="4.5" width="10" height="1" fill="currentColor"/></svg>
+    </button>
+    <button class="win-btn" onclick="winMax()">
+      <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor"/></svg>
+    </button>
+    <button class="win-btn close" onclick="winClose()">
+      <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- HEADER (OLD) -->
+<div id="header">
+  <div class="logo">
+    <span class="logo-delta">Δ</span>
+    <span>CODE UPDATER</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ UNDO</button>
+    <button class="btn" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Shift+Z)" disabled>↷ REDO</button>
+    <span id="history-indicator" style="font-family:var(--mono);font-size:9px;color:var(--text3);margin:0 4px;"></span>
+    <button class="btn" onclick="clearAll()">CLEAR DIFF</button>
+    <button class="btn btn-danger" onclick="resetCode()">RESET</button>
+    <button class="btn btn-success" onclick="applyDiff()">APPLY DIFF</button>
+    <button class="btn btn-primary" onclick="refreshPreview()">⟳ PREVIEW</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+
+    <!-- TOP: CODE EDITOR (Monaco) -->
+    <div class="editor-pane" id="code-pane" style="height: 55%; flex: none;">
+      <div class="editor-label">
+        <div class="status-dot green" id="code-status-dot"></div>
+        <span class="editor-label-text">ORIGINAL CODE</span>
+        <div class="stats-bar">
+          <div class="stat">LINES <span class="stat-val" id="line-count">0</span></div>
+          <div class="stat">CHARS <span class="stat-val" id="char-count">0</span></div>
+        </div>
+      </div>
+      <div class="monaco-wrap" id="monaco-code-wrap">
+        <div class="monaco-loading" id="code-loading"><div class="spinner"></div><span>LOADING EDITOR</span></div>
+        <div id="monaco-code-container"></div>
+      </div>
+    </div>
+
+    <!-- VERTICAL RESIZER -->
+    <div class="v-resizer" id="v-resizer"></div>
+
+    <!-- BOTTOM: DIFF INPUT (Monaco) & VIEWER -->
+    <div class="editor-pane" id="diff-pane" style="flex: 1;">
+      <div class="editor-label">
+        <div class="status-dot" id="diff-status-dot"></div>
+        <span class="editor-label-text">DIFF / CHANGES</span>
+        <div class="mode-toggle" style="margin-left: auto;">
+          <button class="mode-btn active" id="mode-raw" onclick="switchDiffMode('raw')">RAW</button>
+          <button class="mode-btn" id="mode-visual" onclick="switchDiffMode('visual')">VISUAL</button>
+        </div>
+      </div>
+
+      <div id="diff-area">
+        <!-- RAW INPUT MODE (Monaco) -->
+        <div id="diff-raw-mode">
+          <div class="monaco-wrap" id="monaco-diff-wrap">
+            <div class="monaco-loading" id="diff-loading"><div class="spinner"></div><span>LOADING EDITOR</span></div>
+            <div id="monaco-diff-container"></div>
+          </div>
+        </div>
+
+        <!-- VISUAL DIFF MODE -->
+        <div id="diff-visual-mode" style="display:none;">
+          <div id="diff-visual-content">
+            <div class="diff-placeholder">
+              <div class="ph-icon">◈</div>
+              <div class="ph-text">No diff to display</div>
+              <div class="ph-text" style="font-size:10px; margin-top:4px; color: #333;">Switch to RAW and paste diff, then switch back</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HORIZONTAL RESIZER -->
+  <div class="h-resizer" id="h-resizer"></div>
+
+  <!-- RIGHT PANEL: PREVIEW -->
+  <div id="right-panel">
+    <div class="preview-toolbar">
+      <button class="btn" style="font-size:9px; padding: 3px 8px;" onclick="refreshPreview()">↺</button>
+      <div class="url-bar">preview://localhost/index.html</div>
+    </div>
+    <div style="flex: 1; display: flex; align-items: stretch; background: #111; overflow: auto; position: relative;">
+      <iframe id="preview-frame" style="flex: 1; border: none; transition: width 0.3s ease, opacity 0.3s ease;" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <div class="hint-bar">
+      <div class="hint"><span class="kbd">Ctrl+Z</span> Undo</div>
+      <div class="hint"><span class="kbd">Ctrl+Shift+Z</span> Redo</div>
+      <div class="hint"><span class="kbd">Ctrl+Shift+A</span> Apply</div>
+      <div class="hint" id="preview-status" style="margin-left:auto;">NO CONTENT</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MONACO EDITOR LOADER -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.js"></script>
+
+<script>
+// ==================== WINDOW CONTROLS ====================
+function winMin() { if (window.electronAPI) window.electronAPI.minimize(); }
+function winMax() { if (window.electronAPI) window.electronAPI.maximize(); }
+function winClose() { if (window.electronAPI) window.electronAPI.close(); }
+
+// ==================== STATE ====================
+let codeEditor = null;
+let diffEditor = null;
+let currentMode = 'raw';
+
+// ==================== HISTORY (UNDO / REDO) ====================
+const MAX_HISTORY = 100;
+let history = [];       // array of { code, diff, label }
+let historyIndex = -1;  // points to current state in history
+
+function pushHistory(label) {
+  if (!codeEditor) return;
+  var code = codeEditor.getValue();
+  var diff = diffEditor ? diffEditor.getValue() : '';
+
+  // If we're not at the tip, discard the future
+  if (historyIndex < history.length - 1) {
+    history = history.slice(0, historyIndex + 1);
+  }
+
+  // Don't push if identical to current tip
+  if (history.length > 0 && historyIndex >= 0) {
+    var tip = history[historyIndex];
+    if (tip.code === code && tip.diff === diff) return;
+  }
+
+  history.push({ code: code, diff: diff, label: label || 'edit' });
+  if (history.length > MAX_HISTORY) {
+    history.shift();
+  }
+  historyIndex = history.length - 1;
+  updateHistoryUI();
+}
+
+function undo() {
+  if (historyIndex <= 0) {
+    showNotification('Nothing to undo', 'info');
+    return;
+  }
+  // Save current state to redo before moving back
+  historyIndex--;
+  restoreFromHistory();
+  showNotification('Undo', 'info');
+}
+
+function redo() {
+  if (historyIndex >= history.length - 1) {
+    showNotification('Nothing to redo', 'info');
+    return;
+  }
+  historyIndex++;
+  restoreFromHistory();
+  showNotification('Redo', 'info');
+}
+
+function restoreFromHistory() {
+  var state = history[historyIndex];
+  if (!state) return;
+  codeEditor.setValue(state.code);
+  if (diffEditor) diffEditor.setValue(state.diff);
+  updateStats();
+  refreshPreview();
+  parseDiffVisual();
+  updateHistoryUI();
+}
+
+function updateHistoryUI() {
+  var btnUndo = document.getElementById('btn-undo');
+  var btnRedo = document.getElementById('btn-redo');
+  var indicator = document.getElementById('history-indicator');
+
+  if (btnUndo) btnUndo.disabled = (historyIndex <= 0);
+  if (btnRedo) btnRedo.disabled = (historyIndex >= history.length - 1);
+
+  // Visual dim for disabled buttons
+  if (btnUndo) btnUndo.style.opacity = btnUndo.disabled ? '0.3' : '1';
+  if (btnRedo) btnRedo.style.opacity = btnRedo.disabled ? '0.3' : '1';
+
+  if (indicator) {
+ indicator.textContent = (historyIndex + 1) + '/' + history.length;
+  }
+}
+
+const defaultCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My App</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: white;
+      padding: 40px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      font-size: 28px;
+      margin: 0 0 12px;
+      color: #111;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #111;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Hello World</h1>
+    <p>This is a sample component. Use the diff editor to make changes without rewriting everything.</p>
+    <button class="btn">Click Me</button>
+  </div>
+</body>
+</html>`;
+
+// ==================== MONACO LOADING ====================
+require.config({
+  paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
+});
+
+window.MonacoEnvironment = {
+  getWorkerUrl: function(workerId, label) {
+    return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+      self.MonacoEnvironment = { baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/' };
+      importScripts('https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/base/worker/workerMain.js');
+    `)}`;
+  }
+};
+
+require(['vs/editor/editor.main'], function () {
+
+  // Custom theme
+  monaco.editor.defineTheme('delta-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '444444', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'e0e0e0' },
+      { token: 'string', foreground: '4dff91' },
+      { token: 'string.escape', foreground: '88ffbb' },
+      { token: 'number', foreground: 'ffd93d' },
+      { token: 'type', foreground: '4d91ff' },
+      { token: 'tag', foreground: 'f0f0f0' },
+      { token: 'attribute.name', foreground: 'ffd93d' },
+      { token: 'attribute.value', foreground: '4dff91' },
+      { token: 'delimiter', foreground: '666666' },
+      { token: 'delimiter.html', foreground: '555555' },
+      { token: 'metatag.html', foreground: '888888' },
+      { token: 'metatag.content.html', foreground: '4dff91' },
+    ],
+    colors: {
+      'editor.background': '#0a0a0a',
+      'editor.foreground': '#f0f0f0',
+      'editorGutter.background': '#0c0c0c',
+      'editorGutter.border': '#1a1a1a',
+      'editorLineNumber.foreground': '#2a2a2a',
+      'editorLineNumber.activeForeground': '#666666',
+      'editor.selectionBackground': '#ffffff15',
+      'editor.inactiveSelectionBackground': '#ffffff08',
+      'editor.lineHighlightBackground': '#0f0f0f',
+      'editorCursor.foreground': '#ffffff',
+      'editorWhitespace.foreground': '#1a1a1a',
+      'editorIndentGuide.background': '#181818',
+      'editorIndentGuide.activeBackground': '#2a2a2a',
+      'editorBracketMatch.background': '#222222',
+      'editorBracketMatch.border': '#444444',
+      'editorWidget.background': '#111111',
+      'editorWidget.border': '#2a2a2a',
+      'editorSuggestWidget.background': '#111111',
+      'editorSuggestWidget.border': '#2a2a2a',
+      'editorSuggestWidget.selectedBackground': '#1a1a1a',
+      'editorSuggestWidget.highlightForeground': '#f0f0f0',
+      'editorHoverWidget.background': '#111111',
+      'editorHoverWidget.border': '#2a2a2a',
+      'input.background': '#0a0a0a',
+      'input.border': '#2a2a2a',
+      'input.foreground': '#f0f0f0',
+      'input.placeholderForeground': '#444444',
+      'scrollbarSlider.background': '#2a2a2a60',
+      'scrollbarSlider.hoverBackground': '#3a3a3a80',
+      'scrollbarSlider.activeBackground': '#4a4a4aa0',
+      'editorOverviewRuler.border': '#00000000',
+      'editorWidget.shadow': '#00000000',
+      'widget.shadow': '#00000000',
+      'diffEditor.insertedTextBackground': '#1a2e1a60',
+      'diffEditor.removedTextBackground': '#2e1a1a60',
+      'minimap.background': '#0a0a0a',
+    }
+  });
+
+  // Shared editor config
+  var sharedConfig = {
+    theme: 'delta-dark',
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: 12.5,
+    lineHeight: 22,
+    tabSize: 2,
+    insertSpaces: true,
+    lineNumbers: 'on',
+    scrollBeyondLastLine: false,
+    wordWrap: 'off',
+    renderWhitespace: 'none',
+    bracketPairColorization: { enabled: true },
+    guides: { bracketPairs: true, indentation: true },
+    padding: { top: 12, bottom: 12 },
+    overviewRulerLanes: 0,
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
+    contextmenu: true,
+    copyWithSyntaxHighlighting: true,
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    scrollbar: {
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+      verticalSliderSize: 6,
+      horizontalSliderSize: 6,
+    },
+    folding: true,
+    foldingStrategy: 'indentation',
+    showFoldingControls: 'mouseover',
+    links: true,
+    colorDecorators: true,
+  };
+
+  // Create CODE editor
+  codeEditor = monaco.editor.create(document.getElementById('monaco-code-container'), Object.assign({}, sharedConfig, {
+    value: defaultCode,
+    language: 'html',
+    quickSuggestions: { other: true, comments: false, strings: true },
+    suggestOnTriggerCharacters: true,
+    parameterHints: { enabled: true },
+    wordBasedSuggestions: 'currentDocument',
+    matchBrackets: 'always',
+    autoClosingBrackets: 'always',
+    autoClosingQuotes: 'always',
+    autoIndent: 'full',
+    formatOnPaste: true,
+    formatOnType: false,
+    tabCompletion: 'on',
+  }));
+
+  document.getElementById('code-loading').style.display = 'none';
+
+  // Create DIFF editor
+  diffEditor = monaco.editor.create(document.getElementById('monaco-diff-container'), Object.assign({}, sharedConfig, {
+    value: '',
+    language: 'diff',
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+    parameterHints: { enabled: false },
+    wordBasedSuggestions: false,
+    matchBrackets: 'never',
+    autoClosingBrackets: 'never',
+    autoClosingQuotes: 'never',
+    folding: false,
+    lineNumbers: 'on',
+  }));
+
+  document.getElementById('diff-loading').style.display = 'none';
+
+  // Wire events
+  codeEditor.onDidChangeModelContent(function () { updateStats(); });
+  diffEditor.onDidChangeModelContent(function () { parseDiffVisual(); });
+
+  initApp();
+});
+
+// ==================== INIT ====================
+function initApp() {
+  if (!codeEditor || !diffEditor) return;
+
+  // Save initial state
+  pushHistory('initial');
+
+  updateStats();
+  refreshPreview();
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    // Ctrl+Z → Undo (prevent Monaco from handling it)
+    if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+      e.preventDefault();
+      e.stopPropagation();
+      undo();
+      return;
+    }
+    // Ctrl+Shift+Z or Ctrl+Y → Redo
+    if ((e.ctrlKey && e.shiftKey && (e.key === 'Z' || e.key === 'z')) || (e.ctrlKey && e.key === 'y')) {
+      e.preventDefault();
+      e.stopPropagation();
+      redo();
+      return;
+    }
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      e.preventDefault();
+      applyDiff();
+    }
+    if (e.ctrlKey && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+      e.preventDefault();
+      refreshPreview();
+    }
+  }, true); // capture=true to intercept before Monaco
+
+  setupHorizontalResizer();
+  setupVerticalResizer();
+}
+
+// ==================== STATS ====================
+function updateStats() {
+  if (!codeEditor) return;
+  var model = codeEditor.getModel();
+  document.getElementById('line-count').textContent = model.getLineCount();
+  document.getElementById('char-count').textContent = model.getValueLength();
+}
+
+// ==================== PREVIEW ====================
+function refreshPreview() {
+  var code = codeEditor ? codeEditor.getValue().trim() : '';
+  var frame = document.getElementById('preview-frame');
+
+  if (!code) {
+    document.getElementById('preview-status').textContent = 'NO CONTENT';
+    return;
+  }
+
+  frame.style.opacity = '0';
+  setTimeout(function () {
+    var blob = new Blob([code], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    frame.src = url;
+    frame.onload = function () {
+      frame.style.opacity = '1';
+      document.getElementById('preview-status').textContent = 'RENDERED — ' + new Date().toLocaleTimeString();
+    };
+  }, 100);
+}
+
+
+// ==================== DIFF MODE SWITCH ====================
+function switchDiffMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-raw').classList.toggle('active', mode === 'raw');
+  document.getElementById('mode-visual').classList.toggle('active', mode === 'visual');
+  document.getElementById('diff-raw-mode').style.display = mode === 'raw' ? 'flex' : 'none';
+  document.getElementById('diff-visual-mode').style.display = mode === 'visual' ? 'block' : 'none';
+
+  if (mode === 'visual') {
+    parseDiffVisual();
+  } else {
+    setTimeout(function () {
+      if (diffEditor) diffEditor.layout();
+    }, 60);
+  }
+}
+
+// ==================== DIFF PARSER & VISUALIZER ====================
+function parseDiffVisual() {
+  var raw = diffEditor ? diffEditor.getValue() : '';
+  var container = document.getElementById('diff-visual-content');
+
+  if (!raw.trim()) {
+    container.innerHTML = '<div class="diff-placeholder"><div class="ph-icon">◈</div><div class="ph-text">No diff to display</div></div>';
+    return;
+  }
+
+  var lines = raw.split('\n');
+  var html = '';
+  var lineNum = 0;
+
+  lines.forEach(function (line) {
+    lineNum++;
+    if (line.startsWith('---') || line.startsWith('+++')) {
+      html += '<div class="diff-line meta"><div class="dl-num">' + lineNum + '</div><div class="dl-sign"></div><div class="dl-code">' + escHtml(line) + '</div></div>';
+    } else if (line.startsWith('@@')) {
+      html += '<div class="diff-line header"><div class="dl-num">' + lineNum + '</div><div class="dl-sign">◈</div><div class="dl-code">' + escHtml(line) + '</div></div>';
+    } else if (line.startsWith('+')) {
+      html += '<div class="diff-line add"><div class="dl-num">' + lineNum + '</div><div class="dl-sign">+</div><div class="dl-code">' + escHtml(line.slice(1)) + '</div></div>';
+    } else if (line.startsWith('-')) {
+      html += '<div class="diff-line remove"><div class="dl-num">' + lineNum + '</div><div class="dl-sign">−</div><div class="dl-code">' + escHtml(line.slice(1)) + '</div></div>';
+    } else {
+      html += '<div class="diff-line"><div class="dl-num">' + lineNum + '</div><div class="dl-sign"></div><div class="dl-code">' + escHtml(line) + '</div></div>';
+    }
+  });
+
+  container.innerHTML = html;
+
+  var adds = (raw.match(/^\+/gm) || []).length;
+  var removes = (raw.match(/^-/gm) || []).length;
+  var dot = document.getElementById('diff-status-dot');
+  if (adds > 0 || removes > 0) {
+    dot.className = 'status-dot yellow';
+  } else {
+    dot.className = 'status-dot';
+  }
+}
+
+function escHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ==================== APPLY DIFF ====================
+function applyDiff() {
+  var originalCode = codeEditor.getValue();
+  var diffText = diffEditor.getValue().trim();
+
+  if (!diffText) { showNotification('No diff to apply', 'error'); return; }
+  if (!originalCode.trim()) { showNotification('No original code to patch', 'error'); return; }
+
+  try {
+    pushHistory('before apply');
+    var result = applyUnifiedDiff(originalCode, diffText);
+    codeEditor.setValue(result);
+    pushHistory('apply diff');
+    updateStats();
+    refreshPreview();
+
+    document.getElementById('diff-status-dot').className = 'status-dot green';
+    document.getElementById('code-status-dot').className = 'status-dot green';
+
+    // Count changes
+    var addedCount = (diffText.match(/^\+/gm) || []).length;
+    var removedCount = (diffText.match(/^-/gm) || []).length;
+    showNotification('Diff applied: +' + addedCount + ' / -' + removedCount + ' lines', 'success');
+
+    var wrap = document.getElementById('monaco-code-wrap');
+    var flash = document.createElement('div');
+    flash.className = 'apply-flash-overlay';
+    wrap.appendChild(flash);
+    setTimeout(function () { flash.remove(); }, 750);
+  } catch (err) {
+    showNotification('Diff error: ' + err.message, 'error');
+  }
+}
+
+// ==================== DIFF ENGINE ====================
+// Supports:
+//   1. Context diffs (no @@ headers) — just lines starting with ' ', '-', '+'
+//   2. Standard unified diffs with --- / +++ / @@ headers
+//   3. Fuzzy matching for minor whitespace differences
+
+function applyUnifiedDiff(original, diff) {
+  var diffLines = diff.split('\n');
+  var result = original.split('\n');
+  var origIdx = 0;    // current position in result (modifies as we splice)
+  var totalOffset = 0; // cumulative (added - removed) line offset
+
+  // ---- Phase 1: skip file-level headers ----
+  var di = 0;
+  while (di < diffLines.length) {
+    var l = diffLines[di];
+    if (l.startsWith('---') || l.startsWith('+++') ||
+        l.startsWith('diff ') || l.startsWith('index ') ||
+        l.startsWith('old mode') || l.startsWith('new mode') ||
+        l.startsWith('Binary') || l.startsWith('similarity')) {
+      di++;
+      continue;
+    }
+    break;
+  }
+
+  // ---- Phase 2: check if first real line is @@ → use hunk mode ----
+  var hasHunks = false;
+  for (var k = di; k < diffLines.length; k++) {
+    if (diffLines[k].startsWith('@@')) { hasHunks = true; break; }
+    if (diffLines[k].startsWith('+') || diffLines[k].startsWith('-')) break; // hit content → no hunks
+  }
+
+  if (hasHunks) {
+    return applyWithHunks(result, diffLines, di);
+  } else {
+    return applySequential(result, diffLines, di);
+  }
+}
+
+// --- Sequential apply (no @@ headers) ---
+function applySequential(result, diffLines, startDi) {
+  var origIdx = 0;
+  var di = startDi;
+
+  while (di < diffLines.length) {
+    var line = diffLines[di];
+
+    if (line.startsWith('-')) {
+      // REMOVE: find and remove this line near current position
+      var content = line.slice(1);
+      var pos = findLineNearby(result, content, origIdx);
+      if (pos !== -1) {
+        result.splice(pos, 1);
+        origIdx = pos; // stay at the splice point
+      }
+      // else: line not found, skip silently
+      di++;
+
+    } else if (line.startsWith('+')) {
+      // ADD: insert at current position
+      result.splice(origIdx, 0, line.slice(1));
+      origIdx++;
+      di++;
+
+    } else {
+      // CONTEXT: sync position to this line in result
+      var ctx = line.startsWith(' ') ? line.slice(1) : line;
+      if (ctx === '') {
+        // Empty context line — skip
+        di++;
+        continue;
+      }
+      var found = findLineNearby(result, ctx, origIdx, 10);
+      if (found !== -1) {
+        origIdx = found + 1;
+      } else {
+        // Context not found — advance one and keep going
+        origIdx++;
+      }
+      di++;
+    }
+  }
+
+  return result.join('\n');
+}
+
+// --- Hunk-based apply (with @@ headers) ---
+function applyWithHunks(result, diffLines, startDi) {
+  var totalOffset = 0;
+  var di = startDi;
+
+  while (di < diffLines.length) {
+    var line = diffLines[di];
+
+    if (line.startsWith('@@')) {
+      var m = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+      if (m) {
+        var oldStart = parseInt(m[1]) - 1; // 0-indexed
+        var currentPos = oldStart + totalOffset;
+
+        // Ensure we don't go out of bounds
+        if (currentPos < 0) currentPos = 0;
+        if (currentPos > result.length) currentPos = result.length;
+
+        di++;
+
+        // Process this hunk's content
+        while (di < diffLines.length && !diffLines[di].startsWith('@@')) {
+          var dl = diffLines[di];
+
+          if (dl.startsWith('+')) {
+            // Insert
+            result.splice(currentPos, 0, dl.slice(1));
+            currentPos++;
+            totalOffset++;
+            di++;
+
+          } else if (dl.startsWith('-')) {
+            // Remove — find the line near currentPos
+            var removeContent = dl.slice(1);
+            if (currentPos < result.length && result[currentPos] === removeContent) {
+              result.splice(currentPos, 1);
+              totalOffset--;
+            } else {
+              // Fuzzy search nearby
+              var fPos = findLineNearby(result, removeContent, currentPos, 5);
+              if (fPos !== -1) {
+                result.splice(fPos, 1);
+                totalOffset--;
+                currentPos = fPos;
+              }
+            }
+            di++;
+
+          } else {
+            // Context line — sync position
+            var ctx = dl.startsWith(' ') ? dl.slice(1) : dl;
+            if (ctx !== '') {
+              if (currentPos < result.length && result[currentPos] === ctx) {
+                currentPos++;
+              } else {
+                var fPos = findLineNearby(result, ctx, currentPos, 5);
+                if (fPos !== -1) {
+                  currentPos = fPos + 1;
+                } else {
+                  currentPos++;
+                }
+              }
+            }
+            di++;
+          }
+        }
+      } else {
+        di++;
+      }
+    } else {
+      di++;
+    }
+  }
+
+  return result.join('\n');
+}
+
+// --- Find a line near a given position (exact → trimmed → contains) ---
+function findLineNearby(lines, target, start, range) {
+  range = range || 5;
+
+  if (target === '') return start;
+
+  var end = Math.min(lines.length, start + range);
+  var begin = Math.max(0, start - Math.floor(range / 2));
+
+  // Pass 1: exact match
+  for (var i = begin; i < end; i++) {
+    if (lines[i] === target) return i;
+  }
+
+  // Pass 2: trimmed match
+  for (var i = begin; i < end; i++) {
+    if (lines[i].trim() === target.trim()) return i;
+  }
+
+  // Pass 3: full scan exact
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i] === target) return i;
+  }
+
+  // Pass 4: full scan trimmed
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === target.trim()) return i;
+  }
+
+  return -1;
+}
+
+// ==================== MISC ====================
+function clearAll() {
+  if (diffEditor) diffEditor.setValue('');
+  document.getElementById('diff-visual-content').innerHTML = '<div class="diff-placeholder"><div class="ph-icon">◈</div><div class="ph-text">No diff to display</div></div>';
+  document.getElementById('diff-status-dot').className = 'status-dot';
+  showNotification('Diff cleared', 'info');
+}
+
+function resetCode() {
+  if (!confirm('Reset to default code?')) return;
+  pushHistory('before reset');
+  if (codeEditor) codeEditor.setValue(defaultCode);
+  pushHistory('reset');
+  updateStats();
+  refreshPreview();
+  showNotification('Reset to default', 'info');
+}
+
+function showNotification(msg, type) {
+  type = type || 'info';
+  var existing = document.querySelector('.notification');
+  if (existing) existing.remove();
+
+  var n = document.createElement('div');
+  n.className = 'notification ' + type;
+  n.textContent = msg;
+  document.body.appendChild(n);
+
+  setTimeout(function () {
+    n.style.animation = 'fadeIn 0.3s ease reverse';
+    setTimeout(function () { n.remove(); }, 300);
+  }, 3000);
+}
+
+// ==================== RESIZERS ====================
+function setupHorizontalResizer() {
+  var resizer = document.getElementById('h-resizer');
+  var leftPanel = document.getElementById('left-panel');
+  var appEl = document.getElementById('app');
+  var startX, startLeftW;
+
+  function onMouseDown(e) {
+    e.preventDefault();
+    startX = e.clientX;
+    startLeftW = leftPanel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  function onMouseMove(e) {
+    var dx = e.clientX - startX;
+    var totalW = appEl.offsetWidth - resizer.offsetWidth;
+    var newW = Math.max(280, Math.min(totalW - 200, startLeftW + dx));
+    leftPanel.style.width = newW + 'px';
+    leftPanel.style.flex = 'none';
+  }
+
+  function onMouseUp() {
+    resizer.classList.remove('dragging');
+    document.body.classList.remove('resizing');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    if (codeEditor) codeEditor.layout();
+    if (diffEditor) diffEditor.layout();
+  }
+
+  resizer.addEventListener('mousedown', onMouseDown);
+}
+
+function setupVerticalResizer() {
+  var resizer = document.getElementById('v-resizer');
+  var topPane = document.getElementById('code-pane');
+  var bottomPane = document.getElementById('diff-pane');
+  var leftPanel = document.getElementById('left-panel');
+  var startY, startTopH;
+
+  function onMouseDown(e) {
+    e.preventDefault();
+    startY = e.clientY;
+    startTopH = topPane.offsetHeight;
+    resizer.classList.add('dragging');
+    document.body.classList.add('resizing-v');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  function onMouseMove(e) {
+    var dy = e.clientY - startY;
+    var panelH = leftPanel.offsetHeight;
+    var resizerH = resizer.offsetHeight;
+    var newH = Math.max(80, Math.min(panelH - resizerH - 80, startTopH + dy));
+    topPane.style.height = newH + 'px';
+    topPane.style.flex = 'none';
+  }
+
+  function onMouseUp() {
+    resizer.classList.remove('dragging');
+    document.body.classList.remove('resizing-v');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    if (codeEditor) codeEditor.layout();
+    if (diffEditor) diffEditor.layout();
+  }
+
+  resizer.addEventListener('mousedown', onMouseDown);
+}
+</script>
+</body>
+</html>

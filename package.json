@@ -1,0 +1,31 @@
+{
+  "name": "code_changer",
+  "version": "1.0.0",
+  "description": "A fully local, encrypted code changer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.vault.codechanger",
+    "productName": "Code Changer",
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "diff.html",
+      "icon.png"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
